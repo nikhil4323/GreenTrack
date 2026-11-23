@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GreenTrack — Waste Segregation & Collection Optimizer</title>
+
+  <!-- External Styles & Fonts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+
+  <!-- Core Application Stylesheet -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/map.css">
+  <link rel="stylesheet" href="css/textures.css">
+
+  <!-- Third-party Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <!-- Optional TensorFlow.js for client-side MobileNet image classification -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1"></script>
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="site-header">
+    <div class="site-header-inner">
+      <!-- Brand Seal & Title -->
+      <div class="brand-wrapper">
+        <div class="brand-seal" title="GreenTrack Ecological Management Platform">
+          <i class="fa-solid fa-seedling"></i>
+        </div>
+        <div class="brand-text">
+          <h1>
+            GreenTrack
+            <span style="font-size: 0.82rem; font-weight: 600; color: var(--color-gold-600); letter-spacing: 0.05em; font-family: var(--font-sans);">EST. 2026</span>
+          </h1>
+          <span class="brand-tagline">Oakridge University Campus &amp; EcoDistrict • Waste Segregation &amp; Pickup Optimizer</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs with Classic Bevel -->
+      <nav class="nav-tabs-wrapper">
+        <button class="nav-tab-btn active" data-tab="map">
+          <i class="fa-solid fa-map-location-dot"></i> Campus Map
+        </button>
+        <button class="nav-tab-btn" data-tab="classifier">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> AI Classifier
+        </button>
+        <button class="nav-tab-btn" data-tab="optimizer">
+          <i class="fa-solid fa-route"></i> Route Optimizer
+        </button>
+        <button class="nav-tab-btn" data-tab="analytics">
+          <i class="fa-solid fa-chart-pie"></i> ESG Analytics
+        </button>
+        <button class="nav-tab-btn" data-tab="bins">
+          <i class="fa-solid fa-trash-can"></i> Bin Registry
+        </button>
+      </nav>
+
+      <!-- Header Quick Actions & Telemetry Mode -->
+      <div class="header-actions">
+        <div class="simulation-mode-pill" id="simModeBanner" title="Continuous sensor simulation engine">
+          <span class="pulse-dot"></span>
+          <span>Sensor Feed: <strong>Simulated Live Telemetry</strong></span>
+        </div>
+
+        <button class="btn btn-gold btn-sm" id="btnOpenRegisterBin">
+          <i class="fa-solid fa-plus"></i> Register Bin
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Application Body -->
+  <main class="app-container">
+
+    <!-- KPI Summary Ribbon -->
+    <section class="kpi-ribbon">
+      <div class="kpi-card success">
+        <div>
+          <div class="kpi-label">Active Monitored Bins</div>
+          <div class="kpi-value" id="kpiTotalBins">12</div>
+          <div class="kpi-subtext">Across <strong>6 Campus Zones</strong></div>
+        </div>
+        <div class="kpi-icon-seal"><i class="fa-solid fa-trash-can"></i></div>
+      </div>
+
+      <div class="kpi-card warning">
+        <div>
+          <div class="kpi-label">Critical Fill (&ge;80%)</div>
+          <div class="kpi-value" id="kpiCriticalBins" style="color: #C62828;">4</div>
+          <div class="kpi-subtext">Immediate pickup recommended</div>
+        </div>
+        <div class="kpi-icon-seal"><i class="fa-solid fa-triangle-exclamation" style="color: #C62828;"></i></div>
+      </div>
+
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Average Fill Capacity</div>
+          <div class="kpi-value" id="kpiAvgFill">64%</div>
+          <div class="kpi-subtext">Optimal operational band: &lt;70%</div>
+        </div>
+        <div class="kpi-icon-seal"><i class="fa-solid fa-gauge-high"></i></div>
+      </div>
+
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Accumulated Payload</div>
+          <div class="kpi-value" id="kpiTotalWeight">675 kg</div>
+          <div class="kpi-subtext">Estimated <strong>2,310 Liters</strong></div>
+        </div>
+        <div class="kpi-icon-seal"><i class="fa-solid fa-scale-balanced"></i></div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB 1: CAMPUS MAP & LIVE MONITORING
+         ==================================================================== -->
+    <section class="tab-content active" id="tab-map">
+      
+      <!-- Driver Live Dispatch Notification Banner -->
+      <div id="driverDispatchBanner" style="display: none; background: #FFFFFF; border: 2px solid var(--color-gold-500); border-radius: var(--radius-lg); padding: 0.85rem 1.25rem; margin-bottom: 1rem; align-items: center; justify-content: space-between; box-shadow: var(--shadow-float);">
+        <!-- Populated dynamically during live dispatch -->
+      </div>
+
+      <div class="grid-map-sidebar">
+        <!-- Interactive Leaflet Map Area -->
+        <div class="map-card-wrapper">
+          
+          <!-- Floating Controls on Map -->
+          <div class="map-floating-controls">
+            <!-- Stream Filters -->
+            <div class="map-control-pill-group">
+              <span style="font-size: 0.74rem; font-weight: 700; color: var(--color-gold-700); text-transform: uppercase;">Stream:</span>
+              <button class="map-filter-btn active" onclick="window.campusMap.renderAllBins('all'); this.parentElement.querySelectorAll('.map-filter-btn').forEach(b=>b.classList.remove('active')); this.classList.add('active');">All</button>
+              <button class="map-filter-btn" onclick="window.campusMap.renderAllBins('organic'); this.parentElement.querySelectorAll('.map-filter-btn').forEach(b=>b.classList.remove('active')); this.classList.add('active');">Organic</button>
+              <button class="map-filter-btn" onclick="window.campusMap.renderAllBins('recyclable'); this.parentElement.querySelectorAll('.map-filter-btn').forEach(b=>b.classList.remove('active')); this.classList.add('active');">Recyclables</button>
+              <button class="map-filter-btn" onclick="window.campusMap.renderAllBins('paper'); this.parentElement.querySelectorAll('.map-filter-btn').forEach(b=>b.classList.remove('active')); this.classList.add('active');">Paper</button>
+              <button class="map-filter-btn" onclick="window.campusMap.renderAllBins('ewaste'); this.parentElement.querySelectorAll('.map-filter-btn').forEach(b=>b.classList.remove('active')); this.classList.add('active');">E-Waste</button>
+              <button class="map-filter-btn" onclick="window.campusMap.renderAllBins('landfill'); this.parentElement.querySelectorAll('.map-filter-btn').forEach(b=>b.classList.remove('active')); this.classList.add('active');">Landfill</button>
+            </div>
+
+            <!-- Map View Actions -->
+            <div class="map-control-pill-group">
+              <span id="mapCriticalCounter" class="status-pill critical" style="display: none;">0 Critical</span>
+              <button class="btn btn-secondary btn-sm" onclick="window.campusMap.recenter()" title="Recenter Campus Grounds">
+                <i class="fa-solid fa-crosshairs"></i> Recenter
+              </button>
+            </div>
+          </div>
+
+          <!-- Leaflet Map Canvas -->
+          <div id="campusMap"></div>
+        </div>
+
+        <!-- Right Side Monitoring & Scenarios Panel -->
+        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+          
+          <!-- Urgent Attention Card -->
+          <div class="classic-card">
+            <div class="classic-card-header">
+              <div class="classic-card-title">
+                <i class="fa-solid fa-bell" style="color: #C62828;"></i>
+                <div>
+                  <h3>Urgent Attention</h3>
+                  <div class="card-subtitle">Bins requiring prioritized dispatch</div>
+                </div>
+              </div>
+            </div>
+            <div class="classic-card-body" style="padding: 0.85rem;">
+              <div id="urgentBinsMiniList" style="display: flex; flex-direction: column; gap: 0.65rem;">
+                <!-- Populated dynamically or inline -->
+                <div class="queue-item-card" onclick="window.campusMap.flyToBin('BIN-CAF-01')" style="cursor: pointer;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: var(--color-primary-900); font-size: 0.88rem;">Dining Commons Dock</strong>
+                    <span class="status-pill critical">92% Full</span>
+                  </div>
+                  <span style="font-size: 0.72rem; color: #73807B;">BIN-CAF-01 • Organic (273 kg)</span>
+                </div>
+
+                <div class="queue-item-card" onclick="window.campusMap.flyToBin('BIN-ENG-01')" style="cursor: pointer;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: var(--color-primary-900); font-size: 0.88rem;">Packard Eng Courtyard</strong>
+                    <span class="status-pill critical">84% Full</span>
+                  </div>
+                  <span style="font-size: 0.72rem; color: #73807B;">BIN-ENG-01 • Recyclables (24 kg)</span>
+                </div>
+
+                <div class="queue-item-card" onclick="window.campusMap.flyToBin('BIN-DORM-01')" style="cursor: pointer;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: var(--color-primary-900); font-size: 0.88rem;">Wilbur Quad Central</strong>
+                    <span class="status-pill critical">88% Full</span>
+                  </div>
+                  <span style="font-size: 0.72rem; color: #73807B;">BIN-DORM-01 • Recyclables (70 kg)</span>
+                </div>
+              </div>
+
+              <div style="margin-top: 1rem; text-align: center;">
+                <button class="btn btn-primary btn-sm" style="width: 100%;" onclick="window.appUI.switchTab('optimizer')">
+                  <i class="fa-solid fa-route"></i> Open Collection Planner
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sensor Simulation Scenarios -->
+          <div class="classic-card">
+            <div class="classic-card-header">
+              <div class="classic-card-title">
+                <i class="fa-solid fa-microchip" style="color: var(--color-gold-600);"></i>
+                <div>
+                  <h3>Sensor Scenarios</h3>
+                  <div class="card-subtitle">Inject live campus telemetry events</div>
+                </div>
+              </div>
+            </div>
+            <div class="classic-card-body" style="display: flex; flex-direction: column; gap: 0.6rem;">
+              <button class="btn btn-secondary btn-sm" style="justify-content: flex-start;" onclick="window.sensorSim.triggerLunchRush()">
+                <i class="fa-solid fa-utensils" style="color: #2E7D32; width: 18px;"></i> Simulate Lunch Rush (Cafeteria)
+              </button>
+              <button class="btn btn-secondary btn-sm" style="justify-content: flex-start;" onclick="window.sensorSim.triggerCampusFestival()">
+                <i class="fa-solid fa-bullhorn" style="color: #0288D1; width: 18px;"></i> Simulate Campus Athletics Surge
+              </button>
+              <button class="btn btn-secondary btn-sm" style="justify-content: flex-start;" onclick="window.sensorSim.triggerCriticalOverflow()">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #C62828; width: 18px;"></i> Inject Critical 95% Overflow Alert
+              </button>
+              <button class="btn btn-secondary btn-sm" style="justify-content: flex-start;" onclick="window.sensorSim.resetNominal()">
+                <i class="fa-solid fa-arrow-rotate-left" style="color: #666; width: 18px;"></i> Reset All Sensors to Baseline
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB 2: AI WASTE SEGREGATION & CLASSIFIER
+         ==================================================================== -->
+    <section class="tab-content" id="tab-classifier">
+      <div class="grid-2col">
+        
+        <!-- Left: Image Classifier (Presets, Dropzone, Camera) -->
+        <div class="classic-card">
+          <div class="classic-card-header">
+            <div class="classic-card-title">
+              <i class="fa-solid fa-camera-retro" style="color: var(--color-primary-700);"></i>
+              <div>
+                <h3>Visual Waste Classifier</h3>
+                <div class="card-subtitle">AI computer vision &amp; MobileNet recognition</div>
+              </div>
+            </div>
+          </div>
+          <div class="classic-card-body">
+            
+            <!-- Quick Preset Samples -->
+            <div style="margin-bottom: 1.25rem;">
+              <span class="form-label" style="display: flex; justify-content: space-between;">
+                <span>1-Click Test Samples (Instant Evaluation):</span>
+                <span style="font-size: 0.72rem; color: var(--color-gold-700);">Click any sample below</span>
+              </span>
+              <div class="preset-samples-grid" id="presetSamplesGrid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem;">
+                <!-- Filled dynamically by app.js -->
+              </div>
+            </div>
+
+            <div class="divider-double"></div>
+
+            <!-- Image Upload Dropzone -->
+            <div class="form-group">
+              <label class="form-label">Or Upload Custom Waste Photo:</label>
+              <div class="drop-zone-box" id="imageDropZone" onclick="document.getElementById('wasteImageFileInput').click()">
+                <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2rem; color: var(--color-gold-600); margin-bottom: 0.5rem;"></i>
+                <div style="font-weight: 700; color: var(--color-primary-900);">Drop image here, or click to browse</div>
+                <div style="font-size: 0.76rem; color: var(--color-ink-muted); margin-top: 0.2rem;">Supports PNG, JPG, WEBP (Photos of bottles, food, boxes, cans, etc.)</div>
+                <input type="file" id="wasteImageFileInput" accept="image/*" style="display: none;">
+              </div>
+            </div>
+
+            <!-- Optical Scanner Viewport -->
+            <div class="form-group">
+              <label class="form-label">Scanner Optical Feed:</label>
+              <div class="scanner-viewport" id="scannerViewport">
+                <div style="text-align: center; color: #8C9993;">
+                  <i class="fa-solid fa-expand" style="font-size: 2.2rem; margin-bottom: 0.5rem; opacity: 0.4;"></i>
+                  <p style="font-size: 0.82rem;">Select a preset or upload an image to start optical scan</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right: AI Classification Results & Manual Search -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          
+          <!-- AI Result Box -->
+          <div class="classic-card">
+            <div class="classic-card-header">
+              <div class="classic-card-title">
+                <i class="fa-solid fa-microscope" style="color: var(--color-gold-600);"></i>
+                <div>
+                  <h3>Classification &amp; Segregation Advice</h3>
+                  <div class="card-subtitle">Material breakdown and bin recommendation</div>
+                </div>
+              </div>
+            </div>
+            <div class="classic-card-body" id="classificationResultBox">
+              <div style="text-align: center; padding: 3rem 1rem; color: var(--color-ink-muted);">
+                <i class="fa-solid fa-circle-question" style="font-size: 2.5rem; margin-bottom: 0.75rem; color: var(--color-parchment-darkborder);"></i>
+                <h4 style="font-family: var(--font-serif-display); color: var(--color-primary-900);">Awaiting Waste Item Input</h4>
+                <p style="font-size: 0.85rem; max-width: 320px; margin: 0.35rem auto 0 auto;">Select any of the 6 test presets on the left or upload a photo to inspect classification.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Manual Catalog Search -->
+          <div class="classic-card">
+            <div class="classic-card-header">
+              <div class="classic-card-title">
+                <i class="fa-solid fa-book-open" style="color: var(--color-primary-700);"></i>
+                <div>
+                  <h3>Manual Campus Waste Directory</h3>
+                  <div class="card-subtitle">Search 150+ common materials &amp; campus items</div>
+                </div>
+              </div>
+            </div>
+            <div class="classic-card-body">
+              
+              <!-- Search Input -->
+              <div class="form-group input-with-icon">
+                <i class="fa-solid fa-magnifying-glass icon-left"></i>
+                <input type="text" class="form-input" id="manualWasteSearch" placeholder="Type item name: e.g. coffee cup, pizza box, apple, battery, soda can...">
+              </div>
+
+              <!-- Stream Filter Pills -->
+              <div style="display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
+                <button class="map-filter-btn manual-cat-pill active" data-stream="all">All Items</button>
+                <button class="map-filter-btn manual-cat-pill" data-stream="organic">Organic</button>
+                <button class="map-filter-btn manual-cat-pill" data-stream="recyclable">Recyclables</button>
+                <button class="map-filter-btn manual-cat-pill" data-stream="paper">Paper</button>
+                <button class="map-filter-btn manual-cat-pill" data-stream="ewaste">E-Waste</button>
+                <button class="map-filter-btn manual-cat-pill" data-stream="landfill">Landfill</button>
+              </div>
+
+              <!-- Search Results List -->
+              <div id="manualSearchResults" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.65rem;">
+                <!-- Populated dynamically -->
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB 3: ROUTE OPTIMIZER & COLLECTION PLAN
+         ==================================================================== -->
+    <section class="tab-content" id="tab-optimizer">
+      <div class="grid-2col">
+        
+        <!-- Left: Collection Queue (Overflowing Bins) -->
+        <div class="classic-card">
+          <div class="classic-card-header">
+            <div class="classic-card-title">
+              <i class="fa-solid fa-clipboard-list" style="color: var(--color-primary-800);"></i>
+              <div>
+                <h3>Collection Queue</h3>
+                <div class="card-subtitle">Bins exceeding pickup threshold (&ge;75%)</div>
+              </div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="window.appUI.renderRoutePlannerView()">
+              <i class="fa-solid fa-arrows-rotate"></i> Refresh
+            </button>
+          </div>
+          <div class="classic-card-body">
+            <div id="collectionQueueList" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 520px; overflow-y: auto;">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: TSP Route Optimizer & Savings Engine -->
+        <div class="classic-card" id="routeStatsCard">
+          <div class="classic-card-header">
+            <div class="classic-card-title">
+              <i class="fa-solid fa-compass" style="color: var(--color-gold-600);"></i>
+              <div>
+                <h3>TSP Route Optimization</h3>
+                <div class="card-subtitle">Shortest roundtrip &amp; fuel economy calculation</div>
+              </div>
+            </div>
+            <span class="status-pill normal"><i class="fa-solid fa-leaf"></i> EcoFleet Algorithmic Planner</span>
+          </div>
+          <div class="classic-card-body">
+            
+            <!-- Comparison Summary Cards -->
+            <div id="routeComparisonSummary">
+              <!-- Rendered dynamically -->
+            </div>
+
+            <!-- Route Details & Actions -->
+            <div style="background: var(--color-parchment-warm); border: 1px solid var(--color-parchment-darkborder); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
+              <h5 style="font-size: 0.88rem; color: var(--color-primary-900); font-weight: 700; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.4rem;">
+                <i class="fa-solid fa-truck-ramp-box" style="color: var(--color-gold-700);"></i> Fleet Route Waypoints:
+              </h5>
+              <p style="font-size: 0.82rem; color: var(--color-ink-secondary); line-height: 1.45;">
+                Departs Central Resource Recovery Facility &rarr; Visits overflowing bins in optimized sequence &rarr; Returns to depot for weighing &amp; sorting.
+              </p>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem;">
+              <button class="btn btn-primary" style="flex: 1;" onclick="window.appUI.visualizeOptimizedRoute()">
+                <i class="fa-solid fa-map-location-dot"></i> Plot Route on Campus Map
+              </button>
+              <button class="btn btn-gold" style="flex: 1;" onclick="window.appUI.startDriverDispatchSimulation()">
+                <i class="fa-solid fa-truck-fast"></i> Simulate Driver Run
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB 4: ESG & COLLECTION ANALYTICS
+         ==================================================================== -->
+    <section class="tab-content" id="tab-analytics">
+      
+      <!-- Top Action Bar for Analytics -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div>
+          <h2 style="font-size: 1.35rem; color: var(--color-primary-900);">Campus Sustainability &amp; Collection Analytics</h2>
+          <span style="font-size: 0.82rem; color: var(--color-ink-muted); font-family: var(--font-serif-body); font-style: italic;">
+            Real-time environmental performance, diversion rates, and fleet fuel economy
+          </span>
+        </div>
+        <div style="display: flex; gap: 0.65rem;">
+          <button class="btn btn-secondary btn-sm" onclick="window.analyticsManager.exportCsvAuditLog()">
+            <i class="fa-solid fa-file-csv"></i> Export CSV Audit Log
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="window.analyticsManager.triggerPrint()">
+            <i class="fa-solid fa-print"></i> Print ESG Report
+          </button>
+        </div>
+      </div>
+
+      <!-- Charts Grid 2x2 -->
+      <div class="grid-2col" style="margin-bottom: 1.5rem;">
+        
+        <!-- Chart 1: Stream Breakdown -->
+        <div class="classic-card">
+          <div class="classic-card-header">
+            <div class="classic-card-title">
+              <i class="fa-solid fa-chart-pie" style="color: var(--color-primary-700);"></i>
+              <div>
+                <h3>Waste Stream Composition</h3>
+                <div class="card-subtitle">Total kilograms by material category</div>
+              </div>
+            </div>
+          </div>
+          <div class="classic-card-body" style="height: 280px; position: relative;">
+            <canvas id="chartWasteComposition"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: 24h Fill Trends -->
+        <div class="classic-card">
+          <div class="classic-card-header">
+            <div class="classic-card-title">
+              <i class="fa-solid fa-chart-line" style="color: var(--color-gold-600);"></i>
+              <div>
+                <h3>Hourly Fill Velocity Trends</h3>
+                <div class="card-subtitle">Peak campus generation windows</div>
+              </div>
+            </div>
+          </div>
+          <div class="classic-card-body" style="height: 280px; position: relative;">
+            <canvas id="chartFillTrends"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 3: Fleet Optimization -->
+        <div class="classic-card">
+          <div class="classic-card-header">
+            <div class="classic-card-title">
+              <i class="fa-solid fa-gas-pump" style="color: #2E7D32;"></i>
+              <div>
+                <h3>Fleet Route Efficiency</h3>
+                <div class="card-subtitle">Traditional fixed schedule vs GreenTrack TSP</div>
+              </div>
+            </div>
+          </div>
+          <div class="classic-card-body" style="height: 280px; position: relative;">
+            <canvas id="chartEfficiency"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 4: Campus Zone Distribution -->
+        <div class="classic-card">
+          <div class="classic-card-header">
+            <div class="classic-card-title">
+              <i class="fa-solid fa-chart-simple" style="color: var(--color-gold-700);"></i>
+              <div>
+                <h3>Campus Zone Generation</h3>
+                <div class="card-subtitle">Accumulated volume by sector</div>
+              </div>
+            </div>
+          </div>
+          <div class="classic-card-body" style="height: 280px; position: relative;">
+            <canvas id="chartZoneDistribution"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Collection Dispatch History Table -->
+      <div class="classic-card">
+        <div class="classic-card-header">
+          <div class="classic-card-title">
+            <i class="fa-solid fa-clock-rotate-left" style="color: var(--color-primary-800);"></i>
+            <div>
+              <h3>Recent Collection Dispatch Log</h3>
+              <div class="card-subtitle">Audit records of completed truck pickup runs</div>
+            </div>
+          </div>
+        </div>
+        <div class="classic-card-body" style="padding: 0;">
+          <table class="classic-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: var(--color-parchment-warm); border-bottom: 1px solid var(--color-parchment-darkborder); text-align: left; font-size: 0.78rem; color: var(--color-ink-muted); text-transform: uppercase;">
+                <th style="padding: 0.85rem 1.25rem;">Run ID</th>
+                <th style="padding: 0.85rem 1rem;">Timestamp</th>
+                <th style="padding: 0.85rem 1rem;">Bins Emptied</th>
+                <th style="padding: 0.85rem 1rem;">Payload Volume</th>
+                <th style="padding: 0.85rem 1rem;">Route Dist</th>
+                <th style="padding: 0.85rem 1rem;">CO₂ Avoided</th>
+                <th style="padding: 0.85rem 1.25rem;">Operator</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ====================================================================
+         TAB 5: BIN REGISTRY & INVENTORY
+         ==================================================================== -->
+    <section class="tab-content" id="tab-bins">
+      
+      <div class="classic-card">
+        <div class="classic-card-header">
+          <div class="classic-card-title">
+            <i class="fa-solid fa-warehouse" style="color: var(--color-primary-800);"></i>
+            <div>
+              <h3>Campus Bin Inventory &amp; Telemetry Hub</h3>
+              <div class="card-subtitle">Registered receptacles, sensor statuses, and live fill indicators</div>
+            </div>
+          </div>
+          <button class="btn btn-gold btn-sm" onclick="window.appUI.openModal('modalRegisterBin')">
+            <i class="fa-solid fa-plus"></i> Register New Bin
+          </button>
+        </div>
+
+        <!-- Filter bar -->
+        <div style="padding: 1rem 1.25rem; background: var(--color-parchment-warm); border-bottom: 1px solid var(--color-parchment-border); display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+          <div class="input-with-icon" style="flex: 1; max-width: 380px;">
+            <i class="fa-solid fa-magnifying-glass icon-left"></i>
+            <input type="text" class="form-input" placeholder="Search by bin ID, building, or zone..." oninput="window.appUI.renderBinsTable('all', this.value)">
+          </div>
+
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary btn-sm" onclick="window.appState.resetToDefault(); window.appUI.showToast('Reset Complete', 'Bins restored to standard demonstration state.', 'success');">
+              <i class="fa-solid fa-arrow-rotate-left"></i> Reset Demo Data
+            </button>
+          </div>
+        </div>
+
+        <div class="classic-card-body" style="padding: 0;">
+          <table class="classic-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: var(--color-parchment-warm); border-bottom: 1px solid var(--color-parchment-darkborder); text-align: left; font-size: 0.78rem; color: var(--color-ink-muted); text-transform: uppercase;">
+                <th style="padding: 0.85rem 1.25rem;">Bin ID</th>
+                <th style="padding: 0.85rem 1rem;">Location &amp; Zone</th>
+                <th style="padding: 0.85rem 1rem;">Waste Stream</th>
+                <th style="padding: 0.85rem 1rem;">Fill Level</th>
+                <th style="padding: 0.85rem 1rem;">Status</th>
+                <th style="padding: 0.85rem 1rem;">Sensor / Battery</th>
+                <th style="padding: 0.85rem 1.25rem;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="binsTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ====================================================================
+       MODALS
+       ==================================================================== -->
+
+  <!-- Modal 1: Register New Bin -->
+  <div class="modal-overlay" id="modalRegisterBin">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Register New Campus Bin</h3>
+        <button class="modal-close-btn modal-close-trigger"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="formRegisterBin">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Location / Landmark Name <span class="required">*</span></label>
+            <input type="text" class="form-input" id="newBinName" placeholder="e.g. Science Quad - South Lawn" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Campus Zone <span class="required">*</span></label>
+              <select class="form-select" id="newBinZone" required>
+                <option value="Campus Heart">Campus Heart (Quad)</option>
+                <option value="Engineering Quad">Engineering Quad</option>
+                <option value="Science Quad">Science Quad</option>
+                <option value="Dining & Services">Dining & Services</option>
+                <option value="North Residences">North Residences</option>
+                <option value="Athletics">Athletics</option>
+                <option value="Creative Arts">Creative Arts</option>
+                <option value="Medical Sciences">Medical Sciences</option>
+                <option value="Administration">Administration</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Waste Stream Type <span class="required">*</span></label>
+              <select class="form-select" id="newBinStream" required>
+                <option value="recyclable">Dry Recyclables (Plastics/Cans)</option>
+                <option value="organic">Organic & Compost</option>
+                <option value="paper">Paper & Cardboard</option>
+                <option value="ewaste">E-Waste & Batteries</option>
+                <option value="landfill">Residual Landfill</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Container Capacity</label>
+              <select class="form-select" id="newBinCapacity">
+                <option value="120">120 Liters (Standard)</option>
+                <option value="240" selected>240 Liters (Dual Stream)</option>
+                <option value="660">660 Liters (Large Compactor)</option>
+                <option value="1100">1100 Liters (Dumpster)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Initial Fill Level (%)</label>
+              <input type="number" class="form-input" id="newBinFill" min="0" max="100" value="20">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Geospatial Coordinates (Latitude, Longitude)</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; align-items: center;">
+              <input type="number" step="0.0001" class="form-input" id="newBinLat" value="37.4275" placeholder="Latitude">
+              <input type="number" step="0.0001" class="form-input" id="newBinLng" value="-122.1697" placeholder="Longitude">
+              <button type="button" class="btn btn-secondary btn-sm" id="btnPickCoordsOnMap" title="Click on the interactive map to select coordinates">
+                <i class="fa-solid fa-map-pin"></i> Pick on Map
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">IoT Sensor Package</label>
+            <select class="form-select" id="newBinSensorType">
+              <option value="Ultrasonic LiDAR v4">Ultrasonic LiDAR v4 (High-precision depth)</option>
+              <option value="Optical ToF Sensor">Optical ToF Sensor (Time-of-flight)</option>
+              <option value="Dual Infrared Sensor">Dual Infrared Volume Sensor</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-close-trigger">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Register Bin</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 2: Inspect & Adjust Telemetry -->
+  <div class="modal-overlay" id="modalInspectBin">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="inspectBinTitle">Bin Telemetry Inspector</h3>
+        <button class="modal-close-btn modal-close-trigger"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="inspectBinId">
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;">
+          <div style="background: var(--color-parchment-warm); padding: 0.75rem; border-radius: var(--radius-md);">
+            <div style="font-size: 0.75rem; color: var(--color-ink-muted);">Campus Zone</div>
+            <strong id="inspectBinZone" style="color: var(--color-primary-900);">Campus Heart</strong>
+          </div>
+          <div style="background: var(--color-parchment-warm); padding: 0.75rem; border-radius: var(--radius-md);">
+            <div style="font-size: 0.75rem; color: var(--color-ink-muted);">Stream Type</div>
+            <strong id="inspectBinStream" style="color: var(--color-primary-900);">RECYCLABLE</strong>
+          </div>
+          <div style="background: var(--color-parchment-warm); padding: 0.75rem; border-radius: var(--radius-md);">
+            <div style="font-size: 0.75rem; color: var(--color-ink-muted);">Rated Capacity</div>
+            <strong id="inspectBinCapacity" style="color: var(--color-primary-900);">240 Liters</strong>
+          </div>
+          <div style="background: var(--color-parchment-warm); padding: 0.75rem; border-radius: var(--radius-md);">
+            <div style="font-size: 0.75rem; color: var(--color-ink-muted);">Sensor Battery</div>
+            <strong id="inspectBinBattery" style="color: #2E7D32;">94%</strong>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <label class="form-label" style="margin: 0;">Adjust Simulated Fill Level:</label>
+            <strong id="inspectBinFillVal" style="font-size: 1.25rem; color: var(--color-primary-900);">85%</strong>
+          </div>
+          <input type="range" class="form-range" id="inspectBinFillSlider" min="0" max="100" value="85" style="width: 100%; height: 8px; cursor: pointer;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--color-ink-muted); margin-top: 0.35rem;">
+            <span>0% (Empty)</span>
+            <span>60% (Warning)</span>
+            <span>80% (Critical)</span>
+            <span>100% (Overflow)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close-trigger">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnSaveBinTelemetry"><i class="fa-solid fa-floppy-disk"></i> Save Telemetry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Application Logic Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/data/initial-bins.js"></script>
+  <script src="js/data/waste-db.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/classifier.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/simulation.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/analytics.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

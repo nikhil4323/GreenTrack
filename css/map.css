@@ -1,0 +1,247 @@
+/* ==========================================================================
+   GreenTrack - Leaflet Map & Geospatial Styles
+   ========================================================================== */
+
+.map-card-wrapper {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-parchment-border);
+  box-shadow: var(--shadow-card);
+  background: #FFFFFF;
+}
+
+#campusMap {
+  width: 100%;
+  height: 580px;
+  background-color: #E8ECE9;
+  z-index: 10;
+}
+
+/* Map Header Floating Overlay Bar */
+.map-floating-controls {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  z-index: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  gap: 1rem;
+}
+
+.map-control-pill-group {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-parchment-border);
+  box-shadow: var(--shadow-float);
+}
+
+.map-filter-btn {
+  padding: 0.28rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  color: var(--color-ink-secondary);
+  transition: all var(--transition-fast);
+}
+
+.map-filter-btn:hover {
+  background: var(--color-parchment-warm);
+  color: var(--color-primary-900);
+}
+
+.map-filter-btn.active {
+  background: var(--color-primary-800);
+  color: #FFFFFF;
+}
+
+/* Custom Bin Leaflet Markers */
+.custom-bin-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.custom-bin-marker:hover {
+  transform: scale(1.18);
+  z-index: 1000 !important;
+}
+
+.bin-pin {
+  width: 38px;
+  height: 38px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  border: 2px solid #FFFFFF;
+  position: relative;
+}
+
+.bin-pin-icon {
+  transform: rotate(45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 14px;
+}
+
+.bin-pin-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  transform: rotate(45deg);
+  background: #FFFFFF;
+  color: #111;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.15);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+/* Marker stream colors */
+.bin-pin.organic { background: #2E7D32; }
+.bin-pin.recyclable { background: #0288D1; }
+.bin-pin.paper { background: #E65100; }
+.bin-pin.ewaste { background: #C2185B; }
+.bin-pin.landfill { background: #455A64; }
+
+/* Critical pulsing ring */
+.custom-bin-marker.critical .bin-pin {
+  animation: marker-pulse 1.8s infinite;
+}
+
+@keyframes marker-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.7), 0 4px 10px rgba(0,0,0,0.3); }
+  70% { box-shadow: 0 0 0 14px rgba(229, 57, 53, 0), 0 4px 10px rgba(0,0,0,0.3); }
+  100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0), 0 4px 10px rgba(0,0,0,0.3); }
+}
+
+/* Depot Marker */
+.depot-marker {
+  width: 44px;
+  height: 44px;
+  background: #143D2B;
+  border: 2px solid var(--color-gold-400);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-gold-400);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  font-size: 1.25rem;
+}
+
+/* Numbered Waypoint Marker for Route */
+.waypoint-marker {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #1B4332;
+  border: 2px solid #FFFFFF;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+}
+
+.waypoint-marker.depot-waypoint {
+  background: var(--color-gold-600);
+  color: #143D2B;
+}
+
+/* Moving Truck Marker */
+.truck-marker {
+  font-size: 26px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));
+  transition: all 0.5s ease-out;
+}
+
+/* Classic Leaflet Popup Styling */
+.leaflet-popup-content-wrapper {
+  background: #FFFFFF !important;
+  color: var(--color-ink-primary) !important;
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--color-gold-400) !important;
+  box-shadow: var(--shadow-float) !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: #FFFFFF !important;
+}
+
+.popup-plaque {
+  min-width: 260px;
+}
+
+.popup-header {
+  padding: 0.85rem 1rem;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAF8F4 100%);
+  border-bottom: 1px solid var(--color-parchment-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.popup-header h4 {
+  font-family: var(--font-serif-display);
+  font-size: 0.95rem;
+  color: var(--color-primary-900);
+  margin: 0;
+}
+
+.popup-body {
+  padding: 1rem;
+}
+
+.popup-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+  font-size: 0.82rem;
+}
+
+.popup-metric-label {
+  color: var(--color-ink-muted);
+}
+
+.popup-metric-val {
+  font-weight: 700;
+  color: var(--color-ink-primary);
+}
+
+.popup-actions {
+  padding: 0.75rem 1rem;
+  background: var(--color-parchment-warm);
+  border-top: 1px solid var(--color-parchment-border);
+  display: flex;
+  gap: 0.5rem;
+}
